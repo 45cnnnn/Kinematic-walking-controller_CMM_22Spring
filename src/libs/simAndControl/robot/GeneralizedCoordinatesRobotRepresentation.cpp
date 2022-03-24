@@ -164,8 +164,11 @@ P3D GeneralizedCoordinatesRobotRepresentation::
     // rotated around axis by angle alpha.
     
     // TODO: implement your logic here.
-
-    return P3D();
+    V3D vInRB  = V3D(getJointForQIdx(qIndex)->cJPos, pLocal);
+    V3D vInParent = rotateVec(vInRB, getQVal(qIndex), getQAxis(qIndex));
+    P3D pInParent = getJointForQIdx(qIndex)-> pJPos + vInParent;
+    
+    return pInParent;
 }
 
 // returns the world coordinates for point p, which is specified in the local
@@ -185,6 +188,16 @@ P3D GeneralizedCoordinatesRobotRepresentation::getWorldCoordinates(const P3D &p,
     // TODO: implement your logic here.
     //
     //
+    RB *rb_ = rb;
+    P3D pLocal = p;
+    while(getQIdxForJoint(rb_->pJoint) > 5){
+        pLocal = getCoordsInParentQIdxFrameAfterRotation(getQIdxForJoint(rb_->pJoint), pLocal);
+        rb_ = rb_->pJoint->parent;
+        
+    }
+    V3D vInGrandparent = V3D(pLocal);
+    P3D pBase = P3D(getQVal(0), getQVal(1), getQVal(2));
+    pInWorld = pBase + rotateVec(rotateVec(rotateVec(vInGrandparent,getQVal(3),getQAxis(1)),getQVal(4),getQAxis(0)),getQVal(5),getQAxis(2));
 
     return pInWorld;
 }
