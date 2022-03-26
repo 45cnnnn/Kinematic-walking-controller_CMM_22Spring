@@ -57,6 +57,20 @@ public:
             //   see https://eigen.tuxfamily.org/dox-devel/group__LeastSquares.html
 
             // TODO: your implementation should be here.
+            for(int j = 0; j < 4; j++){
+                // calculate Jacobian
+                Matrix J;
+                gcrr.estimate_linear_jacobian(endEffectorTargets[j].p, endEffectorTargets[j].rb, J);
+                J = J.block(0,6,3,q.size() - 6).eval();
+
+                // calculate deltaq
+                Matrix J_T = J.transpose();
+                Matrix I = Matrix::Identity(q.size()-6, q.size()-6);
+                Matrix J_T_J_Inverse = (J_T * J).ldlt().solve(I);
+                dVector deltaq_j = J_T_J_Inverse * J_T  * V3D(endEffectorTargets[j].target - gcrr.getWorldCoordinates(endEffectorTargets[j].p, endEffectorTargets[j].rb));
+                
+                deltaq += deltaq_j; 
+            }
 
             q.tail(q.size() - 6) += deltaq;
 

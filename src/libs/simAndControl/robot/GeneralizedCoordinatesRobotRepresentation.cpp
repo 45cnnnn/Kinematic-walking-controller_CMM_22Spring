@@ -189,13 +189,12 @@ P3D GeneralizedCoordinatesRobotRepresentation::getWorldCoordinates(const P3D &p,
     //
     //
     RB *rb_ = rb;
-    P3D pLocal = p;
+    P3D pLocal_ = p;
     while(getQIdxForJoint(rb_->pJoint) > 5){
-        pLocal = getCoordsInParentQIdxFrameAfterRotation(getQIdxForJoint(rb_->pJoint), pLocal);
+        pLocal_ = getCoordsInParentQIdxFrameAfterRotation(getQIdxForJoint(rb_->pJoint), pLocal_);
         rb_ = rb_->pJoint->parent;
-        
     }
-    V3D vInGrandparent = V3D(pLocal);
+    V3D vInGrandparent = V3D(pLocal_);
     P3D pBase = P3D(getQVal(0), getQVal(1), getQVal(2));
     pInWorld = pBase + rotateVec(rotateVec(rotateVec(vInGrandparent,getQVal(3),getQAxis(1)),getQVal(4),getQAxis(0)),getQVal(5),getQAxis(2));
 
@@ -267,12 +266,12 @@ void GeneralizedCoordinatesRobotRepresentation::estimate_linear_jacobian(
         // TODO: Ex. 2-1 Inverse Kinematics - Jacobian by Finite Difference
         // compute Jacobian matrix dpdq_i by FD and fill dpdq
         q[i] = val + h;
-        P3D p_p;  // TODO: fix this: p(qi + h);
+        P3D p_p = getWorldCoordinates(p, rb);  // TODO: fix this: p(qi + h);
 
         q[i] = val - h;
-        P3D p_m;  // TODO: fix this: p(qi - h)
+        P3D p_m = getWorldCoordinates(p, rb);  // TODO: fix this: p(qi - h)
 
-        V3D dpdq_i(0, 0, 0);  // TODO: fix this: compute derivative dp(q)/dqi
+        V3D dpdq_i = V3D(p_m, p_p) / (2*h);  // TODO: fix this: compute derivative dp(q)/dqi
 
         // set Jacobian matrix components
         dpdq(0, i) = dpdq_i[0];
