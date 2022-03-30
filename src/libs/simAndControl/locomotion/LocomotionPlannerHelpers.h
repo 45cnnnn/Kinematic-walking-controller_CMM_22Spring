@@ -250,9 +250,11 @@ private:
             // - quaternion heading = Roty(headingAngle). (we use y-up world frame coordinate)
             // - you can get the robot's forward direction vector from robot->forward
             // - you can get the robot's sideways direction vector by RBGlobals::worldUp.cross(robot->forward)
+            V3D posLocal = V3D(vSideways * dt, 0, vForward * dt);
+            V3D posGlobal = rotateVec(posLocal, headingAngle, V3D(0, 1, 0));
+            pos = pos + posGlobal/* + TODO: fix this */;
 
-            pos = pos /* + TODO: fix this */;
-            headingAngle = headingAngle /* + TODO: fix this */;
+            headingAngle = headingAngle + turningSpeed * dt/* + TODO: fix this */;
 
             t += dt;
         }

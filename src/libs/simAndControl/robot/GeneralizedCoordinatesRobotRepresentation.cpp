@@ -151,23 +151,23 @@ void GeneralizedCoordinatesRobotRepresentation::getQFromReducedState(
 */
 P3D GeneralizedCoordinatesRobotRepresentation::
     getCoordsInParentQIdxFrameAfterRotation(int qIndex, const P3D &pLocal) {
-    // if qIndex <= 2, this q is a component of position of the base. 
+    // if qIndex <= 2, this q is a component of position of the base.
     if (qIndex <= 2) return pLocal;
 
     // TODO: Ex.1 Forward Kinematics
     // this is a subfunction for getWorldCoordinates() and compute_dpdq()
     // return the point in the coordinate frame of the parent of qIdx after
     // the DOF rotation has been applied.
-    // 
+    //
     // Hint:
-    // - use rotateVec(const V3D &v, double alpha, const V3D &axis) to get a vector 
+    // - use rotateVec(const V3D &v, double alpha, const V3D &axis) to get a vector
     // rotated around axis by angle alpha.
-    
+
     // TODO: implement your logic here.
-    V3D vInRB  = V3D(getJointForQIdx(qIndex)->cJPos, pLocal);
+    V3D vInRB = V3D(getJointForQIdx(qIndex)->cJPos, pLocal);
     V3D vInParent = rotateVec(vInRB, getQVal(qIndex), getQAxis(qIndex));
-    P3D pInParent = getJointForQIdx(qIndex)-> pJPos + vInParent;
-    
+    P3D pInParent = getJointForQIdx(qIndex)->pJPos + vInParent;
+
     return pInParent;
 }
 
@@ -181,7 +181,7 @@ P3D GeneralizedCoordinatesRobotRepresentation::getWorldCoordinates(const P3D &p,
     // Hint: you may want to use the following functions
     // - getQIdxForJoint()
     // - getParentQIdxOf()
-    // - getCoordsInParentQIdxFrameAfterRotation() 
+    // - getCoordsInParentQIdxFrameAfterRotation()
 
     P3D pInWorld;
 
@@ -190,13 +190,18 @@ P3D GeneralizedCoordinatesRobotRepresentation::getWorldCoordinates(const P3D &p,
     //
     RB *rb_ = rb;
     P3D pLocal_ = p;
-    while(getQIdxForJoint(rb_->pJoint) > 5){
-        pLocal_ = getCoordsInParentQIdxFrameAfterRotation(getQIdxForJoint(rb_->pJoint), pLocal_);
+    while (getQIdxForJoint(rb_->pJoint) > 5) {
+        pLocal_ = getCoordsInParentQIdxFrameAfterRotation(
+            getQIdxForJoint(rb_->pJoint), pLocal_);
         rb_ = rb_->pJoint->parent;
     }
     V3D vInGrandparent = V3D(pLocal_);
     P3D pBase = P3D(getQVal(0), getQVal(1), getQVal(2));
-    pInWorld = pBase + rotateVec(rotateVec(rotateVec(vInGrandparent,getQVal(3),getQAxis(1)),getQVal(4),getQAxis(0)),getQVal(5),getQAxis(2));
+    pInWorld =
+        pBase +
+        rotateVec(rotateVec(rotateVec(vInGrandparent, getQVal(5), getQAxis(2)),
+                            getQVal(4), getQAxis(0)),
+                  getQVal(3), getQAxis(1));
 
     return pInWorld;
 }
@@ -252,6 +257,49 @@ void GeneralizedCoordinatesRobotRepresentation::compute_dpdq(const P3D &p,
     // - getParentQIdxOf()
 
     // TODO: your implementation should be here
+
+    // 6th columns and beyond
+    RB *rb_ = rb;
+    P3D pLocal_ = p;
+
+    while (getQIdxForJoint(rb_->pJoint) > 5) {
+        int qIndex = getQIdxForJoint(rb_->pJoint);
+        V3D axis = getWorldCoordsAxisForQ(qIndex);
+
+        Quaternion q = getWorldRotationForQ(qIndex);
+        V3D dpdq_i = axis.cross(q*V3D(getJointForQIdx(qIndex)->cJPos, pLocal_)); //vector in world coordinate
+        dpdq.block(0,qIndex,3,1) = dpdq_i;
+
+        pLocal_ = getCoordsInParentQIdxFrameAfterRotation(
+            getQIdxForJoint(rb_->pJoint), pLocal_);
+        rb_ = rb_->pJoint->parent;
+    }
+
+    // 0-3th columns are indentity matrix
+    dpdq.block(0, 0, 3, 3) = Matrix::Identity(3, 3);
+
+    // 4-6th columns
+    // rotation matrix and vInGrandparent
+    V3D vInGrandparent = V3D(pLocal_);
+    auto y = getQVal(3);
+    auto x = getQVal(4);
+    auto z = getQVal(5);
+    Matrix3x3 R_y, R_x, R_z, R_y_dot, R_x_dot, R_z_dot;
+    R_y << cos(y), 0, sin(y), 0, 1, 0, -sin(y), 0, cos(y);
+    R_y_dot << -sin(y), 0, cos(y), 0, 0, 0, -cos(y), 0, -sin(y);
+    R_x << 1, 0, 0, 0, cos(x), -sin(x), 0, sin(x), cos(x);
+    R_x_dot << 0, 0, 0, 0, -sin(x), -cos(x), 0, cos(x), -sin(x);
+    R_z << cos(z), -sin(z), 0, sin(z), cos(z), 0, 0, 0, 1;
+    R_z_dot << -sin(z), -cos(z), 0, cos(z), -sin(z), 0, 0, 0, 0;
+
+    dpdq.block(0,3,3,1) = R_y_dot * R_x * R_z * vInGrandparent;
+    dpdq.block(0,4,3,1) = R_y * R_x_dot * R_z * vInGrandparent;
+    dpdq.block(0,5,3,1) = R_y * R_x * R_z_dot * vInGrandparent;
+
+    // for(int i=0; i<(int)q.size(); i++){
+    //     std::cout << dpdq.col(i) << std::endl;
+    // }
+
 }
 
 // estimates the linear jacobian dp/dq using finite differences
@@ -271,7 +319,8 @@ void GeneralizedCoordinatesRobotRepresentation::estimate_linear_jacobian(
         q[i] = val - h;
         P3D p_m = getWorldCoordinates(p, rb);  // TODO: fix this: p(qi - h)
 
-        V3D dpdq_i = V3D(p_m, p_p) / (2*h);  // TODO: fix this: compute derivative dp(q)/dqi
+        V3D dpdq_i = V3D(p_m, p_p) /
+                     (2 * h);  // TODO: fix this: compute derivative dp(q)/dqi
 
         // set Jacobian matrix components
         dpdq(0, i) = dpdq_i[0];
