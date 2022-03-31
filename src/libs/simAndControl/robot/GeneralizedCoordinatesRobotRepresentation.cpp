@@ -261,11 +261,10 @@ void GeneralizedCoordinatesRobotRepresentation::compute_dpdq(const P3D &p,
     // 6th columns and beyond
     RB *rb_ = rb;
     P3D pLocal_ = p;
+    int qIndex = getQIdxForJoint(rb_->pJoint);
 
-    while (getQIdxForJoint(rb_->pJoint) > 5) {
-        int qIndex = getQIdxForJoint(rb_->pJoint);
+    while (qIndex > 5) {
         V3D axis = getWorldCoordsAxisForQ(qIndex);
-
         Quaternion q = getWorldRotationForQ(qIndex);
         V3D dpdq_i = axis.cross(q*V3D(getJointForQIdx(qIndex)->cJPos, pLocal_)); //vector in world coordinate
         dpdq.block(0,qIndex,3,1) = dpdq_i;
@@ -273,28 +272,20 @@ void GeneralizedCoordinatesRobotRepresentation::compute_dpdq(const P3D &p,
         pLocal_ = getCoordsInParentQIdxFrameAfterRotation(
             getQIdxForJoint(rb_->pJoint), pLocal_);
         rb_ = rb_->pJoint->parent;
+        qIndex = getQIdxForJoint(rb_->pJoint);
+    }
+    
+    // 4-6th columns
+    while(qIndex > 2){
+        V3D axis = getWorldCoordsAxisForQ(qIndex);
+        Quaternion q = getWorldRotationForQ(qIndex);
+        V3D dpdq_i = axis.cross(q*V3D(pLocal_));
+        dpdq.block(0,qIndex,3,1) = dpdq_i;
+        qIndex--;
     }
 
     // 0-3th columns are indentity matrix
     dpdq.block(0, 0, 3, 3) = Matrix::Identity(3, 3);
-
-    // 4-6th columns
-    // rotation matrix and vInGrandparent
-    V3D vInGrandparent = V3D(pLocal_);
-    auto y = getQVal(3);
-    auto x = getQVal(4);
-    auto z = getQVal(5);
-    Matrix3x3 R_y, R_x, R_z, R_y_dot, R_x_dot, R_z_dot;
-    R_y << cos(y), 0, sin(y), 0, 1, 0, -sin(y), 0, cos(y);
-    R_y_dot << -sin(y), 0, cos(y), 0, 0, 0, -cos(y), 0, -sin(y);
-    R_x << 1, 0, 0, 0, cos(x), -sin(x), 0, sin(x), cos(x);
-    R_x_dot << 0, 0, 0, 0, -sin(x), -cos(x), 0, cos(x), -sin(x);
-    R_z << cos(z), -sin(z), 0, sin(z), cos(z), 0, 0, 0, 1;
-    R_z_dot << -sin(z), -cos(z), 0, cos(z), -sin(z), 0, 0, 0, 0;
-
-    dpdq.block(0,3,3,1) = R_y_dot * R_x * R_z * vInGrandparent;
-    dpdq.block(0,4,3,1) = R_y * R_x_dot * R_z * vInGrandparent;
-    dpdq.block(0,5,3,1) = R_y * R_x * R_z_dot * vInGrandparent;
 
     // for(int i=0; i<(int)q.size(); i++){
     //     std::cout << dpdq.col(i) << std::endl;
