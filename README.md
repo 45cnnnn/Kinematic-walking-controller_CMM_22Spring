@@ -6,10 +6,10 @@
 
 Leave your name, student ID, ETH email address and URL link to demo video here.
 
-- Name:
-- Student ID:
-- ETH Email:
-- Demo Video URL:
+- Name: Zhongrui Yu
+- Student ID: 21-947-841
+- ETH Email: zhonyu@student.ethz.ch
+- Demo Video URL: https://www.youtube.com/watch?v=ZDIYqPl67ys
 
 ----
 
